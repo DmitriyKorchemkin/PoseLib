@@ -156,7 +156,7 @@ void compute_trace_constraints(const Eigen::Matrix<double, 4, 9> &N, Eigen::Matr
 #undef EE
 }
 
-int relpose_5pt(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eigen::Vector3d> &x2, std::vector<Eigen::Matrix3d> *essential_matrices) {
+int relpose_5pt(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eigen::Vector3d> &x2, std::vector<Eigen::Matrix3d> *essential_matrices, bool companion_roots) {
 
     // Compute nullspace to epipolar constraints
     Eigen::Matrix<double, 9, 5> epipolar_constraints;
@@ -203,7 +203,7 @@ int relpose_5pt(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eigen:
 
     // Solve for the roots using sturm bracketing
     double roots[10];
-    int n_sols = pose_lib::sturm::bisect_sturm<10>(c, roots);
+    int n_sols = pose_lib::sturm::bisect_sturm<10>(c, roots, companion_roots);
 
     // Back substitution to recover essential matrices
     Eigen::Matrix<double, 3, 2> B;
@@ -243,9 +243,9 @@ int relpose_5pt(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eigen:
     return n_sols;
 }
 
-int relpose_5pt(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eigen::Vector3d> &x2, std::vector<CameraPose> *output) {
+int relpose_5pt(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eigen::Vector3d> &x2, std::vector<CameraPose> *output, bool companion_roots) {
     std::vector<Eigen::Matrix3d> essential_matrices;
-    int n_sols = relpose_5pt(x1, x2, &essential_matrices);
+    int n_sols = relpose_5pt(x1, x2, &essential_matrices, companion_roots);
 
     output->clear();
     output->reserve(n_sols);

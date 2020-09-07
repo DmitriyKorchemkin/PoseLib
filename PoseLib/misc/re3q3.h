@@ -39,7 +39,7 @@ namespace re3q3 {
     * 
     * Order of coefficients is:  x^2, xy, xz, y^2, yz, z^2, x, y, z, 1.0; *
     */
-int re3q3(const Eigen::Matrix<double, 3, 10> &coeffs, Eigen::Matrix<double, 3, 8> *solutions, bool try_random_var_change = true);
+int re3q3(const Eigen::Matrix<double, 3, 10> &coeffs, Eigen::Matrix<double, 3, 8> *solutions, bool try_random_var_change = true, bool companion_roots = false);
 
 // Helper functions for setting up 3Q3 problems
 
@@ -61,8 +61,8 @@ void cayley_param(const Eigen::Matrix<double, 3, 1> &c, Eigen::Matrix<double, 3,
     The solutions matrix is 4x8 and contains quaternions. To get back rotation matrices you can use
         Eigen::Quaterniond(solutions.col(i)).toRotationMatrix();
 */
-int re3q3_rotation(const Eigen::Matrix<double, 3, 9>& Rcoeffs, Eigen::Matrix<double, 4, 8>* solutions, bool try_random_var_change = true);
-int re3q3_rotation(const Eigen::Matrix<double, 3, 10>& Rcoeffs, Eigen::Matrix<double, 4, 8>* solutions, bool try_random_var_change = true);
+int re3q3_rotation(const Eigen::Matrix<double, 3, 9>& Rcoeffs, Eigen::Matrix<double, 4, 8>* solutions, bool try_random_var_change = true, bool companion_roots = true);
+int re3q3_rotation(const Eigen::Matrix<double, 3, 10>& Rcoeffs, Eigen::Matrix<double, 4, 8>* solutions, bool try_random_var_change = true, bool companion_roots = true);
 
 } // namespace re3q3
 } // namespace pose_lib

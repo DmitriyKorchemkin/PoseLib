@@ -16,8 +16,14 @@ struct BenchmarkResult {
   int instances_ = 0;
   int solutions_ = 0;
   int valid_solutions_ = 0;
+  int at_least_one_valid_ = 0;
   int found_gt_pose_ = 0;
   int runtime_ns_ = 0;
+  double err_med = -1.;
+  double err_q90 = -1.;
+  double err_q95 = -1.;
+  double err_q99 = -1.;
+  double err_q999 = -1.;
 };
 
 // Wrappers for the Benchmarking code
@@ -30,12 +36,13 @@ struct SolverP3P {
   static std::string name() { return "p3p"; }
 };
 
+template <bool companion_roots, bool orthogonalize, p4pf_filter filter>
 struct SolverP4PF {
   static inline int solve(const AbsolutePoseProblemInstance &instance, pose_lib::CameraPoseVector *solutions) {
-    return p4pf(instance.x_point_, instance.X_point_, solutions);
+    return p4pf(instance.x_point_, instance.X_point_, solutions, companion_roots, filter, orthogonalize);
   }
   typedef UnknownFocalValidator validator;
-  static std::string name() { return "p4pf"; }
+  static std::string name() { return std::string("p4pf-") + (companion_roots ? "eig" : "sturm") + (orthogonalize ? "-orth" : "-raw") + to_string(filter); }
 };
 
 struct SolverGP3P {
@@ -174,12 +181,13 @@ struct SolverRel8pt {
   static std::string name() { return "Rel8pt"; }
 };
 
+template <bool companion_roots>
 struct SolverRel5pt {
   static inline int solve(const RelativePoseProblemInstance& instance, pose_lib::CameraPoseVector* solutions) {
-    return relpose_5pt(instance.x1_, instance.x2_, solutions);
+    return relpose_5pt(instance.x1_, instance.x2_, solutions, companion_roots);
   }
   typedef CalibPoseValidator validator;
-  static std::string name() { return "Rel5pt"; }
+  static std::string name() { return std::string("Rel5pt-") +(companion_roots ? "eig" : "sturm"); }
 };
 
 

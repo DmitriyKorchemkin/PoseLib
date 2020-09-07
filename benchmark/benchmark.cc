@@ -1,8 +1,10 @@
 #include "benchmark.h"
 #include "problem_generator.h"
+#include <algorithm>
 #include <chrono>
 #include <iomanip>
 #include <iostream>
+#include <vector>
 
 namespace pose_lib {
 
@@ -20,6 +22,8 @@ BenchmarkResult benchmark(int n_problems, const ProblemOptions &options, double 
     }
     result.options_ = options;
     std::cout << "Running benchmark: " << result.name_ << std::flush;
+    std::vector<double> errors;
+    errors.reserve(n_problems);
 
     // Run benchmark where we check solution quality
     for (const AbsolutePoseProblemInstance &instance : problem_instances) {
@@ -31,13 +35,19 @@ BenchmarkResult benchmark(int n_problems, const ProblemOptions &options, double 
 
         result.solutions_ += sols;
         //std::cout << "Gt: " << instance.pose_gt.R << "\n"<< instance.pose_gt.t << "\n";
+        bool found_valid = false;
         for (const CameraPose &pose : solutions) {
-            if (Solver::validator::is_valid(instance, pose, tol))
+            if (Solver::validator::is_valid(instance, pose, tol)) {
                 result.valid_solutions_++;
+                found_valid = true;
+            }
             //std::cout << "Pose: " << pose.R << "\n" << pose.t << "\n";
             pose_error = std::min(pose_error, Solver::validator::compute_pose_error(instance, pose));
         }
+        if (found_valid)
+          result.at_least_one_valid_++;
 
+        errors.push_back(pose_error);
         if (pose_error < tol)
             result.found_gt_pose_++;
     }
@@ -59,8 +69,36 @@ BenchmarkResult benchmark(int n_problems, const ProblemOptions &options, double 
         runtimes.push_back(std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count());
     }
 
-    std::sort(runtimes.begin(), runtimes.end());
-    result.runtime_ns_ = runtimes[runtimes.size() / 2];
+    auto med_runtime = runtimes.begin() + runtimes.size() / 2;
+    std::nth_element(runtimes.begin(), med_runtime, runtimes.end());
+    result.runtime_ns_ = *med_runtime;
+
+    auto prev_quantile = errors.begin();
+    auto tgt_quantile = errors.begin() + errors.size() * 0.5;
+    std::nth_element(prev_quantile, tgt_quantile, errors.end());
+    result.err_med = *tgt_quantile;
+
+    prev_quantile = tgt_quantile;
+    tgt_quantile = errors.begin() + errors.size() * 0.9;
+    std::nth_element(prev_quantile, tgt_quantile, errors.end());
+    result.err_q90 = *tgt_quantile;
+
+    prev_quantile = tgt_quantile;
+    tgt_quantile = errors.begin() + errors.size() * 0.95;
+    std::nth_element(prev_quantile, tgt_quantile, errors.end());
+    result.err_q95 = *tgt_quantile;
+
+    prev_quantile = tgt_quantile;
+    tgt_quantile = errors.begin() + errors.size() * 0.99;
+    std::nth_element(prev_quantile, tgt_quantile, errors.end());
+    result.err_q99 = *tgt_quantile;
+
+    prev_quantile = tgt_quantile;
+    tgt_quantile = errors.begin() + errors.size() * 0.999;
+    std::nth_element(prev_quantile, tgt_quantile, errors.end());
+    result.err_q999 = *tgt_quantile;
+
+
     std::cout << "\r                                                                                \r";
     return result;
 }
@@ -80,6 +118,8 @@ BenchmarkResult benchmark_relative(int n_problems, const ProblemOptions &options
     result.options_ = options;
     std::cout << "Running benchmark: " << result.name_ << std::flush;
 
+    std::vector<double> errors;
+    errors.reserve(n_problems);
     // Run benchmark where we check solution quality
     for (const RelativePoseProblemInstance &instance : problem_instances) {
         CameraPoseVector solutions;
@@ -90,13 +130,19 @@ BenchmarkResult benchmark_relative(int n_problems, const ProblemOptions &options
 
         result.solutions_ += sols;
         //std::cout << "Gt: " << instance.pose_gt.R << "\n"<< instance.pose_gt.t << "\n";
+        bool found_valid = false;
         for (const CameraPose &pose : solutions) {
-            if (Solver::validator::is_valid(instance, pose, tol))
+            if (Solver::validator::is_valid(instance, pose, tol)) {
                 result.valid_solutions_++;
+                found_valid = true;
+            }
             //std::cout << "Pose: " << pose.R << "\n" << pose.t << "\n";
             pose_error = std::min(pose_error, Solver::validator::compute_pose_error(instance, pose));
         }
+        if (found_valid)
+          ++result.at_least_one_valid_;
 
+        errors.push_back(pose_error);
         if (pose_error < tol)
             result.found_gt_pose_++;
     }
@@ -118,9 +164,35 @@ BenchmarkResult benchmark_relative(int n_problems, const ProblemOptions &options
         runtimes.push_back(std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count());
     }
 
-    std::sort(runtimes.begin(), runtimes.end());
+    auto med_runtime = runtimes.begin() + runtimes.size() / 2;
+    std::nth_element(runtimes.begin(), med_runtime, runtimes.end());
+    result.runtime_ns_ = *med_runtime;
 
-    result.runtime_ns_ = runtimes[runtimes.size() / 2];
+    auto prev_quantile = errors.begin();
+    auto tgt_quantile = errors.begin() + errors.size() * 0.5;
+    std::nth_element(prev_quantile, tgt_quantile, errors.end());
+    result.err_med = *tgt_quantile;
+
+    prev_quantile = tgt_quantile;
+    tgt_quantile = errors.begin() + errors.size() * 0.9;
+    std::nth_element(prev_quantile, tgt_quantile, errors.end());
+    result.err_q90 = *tgt_quantile;
+
+    prev_quantile = tgt_quantile;
+    tgt_quantile = errors.begin() + errors.size() * 0.95;
+    std::nth_element(prev_quantile, tgt_quantile, errors.end());
+    result.err_q95 = *tgt_quantile;
+
+    prev_quantile = tgt_quantile;
+    tgt_quantile = errors.begin() + errors.size() * 0.99;
+    std::nth_element(prev_quantile, tgt_quantile, errors.end());
+    result.err_q99 = *tgt_quantile;
+
+    prev_quantile = tgt_quantile;
+    tgt_quantile = errors.begin() + errors.size() * 0.999;
+    std::nth_element(prev_quantile, tgt_quantile, errors.end());
+    result.err_q999 = *tgt_quantile;
+
     std::cout << "\r                                                                                \r";
     return result;
 }
@@ -143,15 +215,21 @@ void display_result(const std::vector<pose_lib::BenchmarkResult> &results) {
     // Print PoseLib version and buidling type
     std::cout << "\n" << poselib_info() << "\n\n";
 
-    int w = 13;
+    int w = 16;
     // display header
     std::cout << std::setw(2 * w) << "Solver";
     std::cout << std::setw(w) << "Solutions";
     std::cout << std::setw(w) << "Valid";
+    std::cout << std::setw(w) << "1+ valid";
     std::cout << std::setw(w) << "GT found";
+    std::cout << std::setw(w) << "0.5 quantile";
+    std::cout << std::setw(w) << "0.9 quantile";
+    std::cout << std::setw(w) << "0.95 quantile";
+    std::cout << std::setw(w) << "0.99 quantile";
+    std::cout << std::setw(w) << "0.999 quantile";
     std::cout << std::setw(w) << "Runtime"
               << "\n";
-    for (int i = 0; i < w * 6; ++i)
+    for (int i = 0; i < w * 12; ++i)
         std::cout << "-";
     std::cout << "\n";
 
@@ -161,13 +239,25 @@ void display_result(const std::vector<pose_lib::BenchmarkResult> &results) {
         double num_tests = static_cast<double>(result.instances_);
         double solutions = result.solutions_ / num_tests;
         double valid_sols = result.valid_solutions_ / static_cast<double>(result.solutions_) * 100.0;
+        double at_least_one = result.at_least_one_valid_ / num_tests * 100.;
         double gt_found = result.found_gt_pose_ / num_tests * 100.0;
         double runtime_ns = result.runtime_ns_ / num_tests;
+        double q05 = result.err_med;
+        double q09 = result.err_q90;
+        double q095 = result.err_q95;
+        double q099 = result.err_q99;
+        double q0999 = result.err_q999;
 
         std::cout << std::setprecision(prec) << std::setw(2 * w) << result.name_;
         std::cout << std::setprecision(prec) << std::setw(w) << solutions;
         std::cout << std::setprecision(prec) << std::setw(w) << valid_sols;
+        std::cout << std::setprecision(prec) << std::setw(w) << at_least_one;
         std::cout << std::setprecision(prec) << std::setw(w) << gt_found;
+        std::cout << std::setprecision(prec) << std::setw(w) << q05;
+        std::cout << std::setprecision(prec) << std::setw(w) << q09;
+        std::cout << std::setprecision(prec) << std::setw(w) << q095;
+        std::cout << std::setprecision(prec) << std::setw(w) << q099;
+        std::cout << std::setprecision(prec) << std::setw(w) << q0999;
         std::cout << std::setprecision(prec) << std::setw(w - 3);
         print_runtime(runtime_ns);
         std::cout << "\n";
@@ -216,7 +306,20 @@ int main() {
     p4pf_opt.n_point_point_ = 4;
     p4pf_opt.n_point_line_ = 0;
     p4pf_opt.unknown_focal_ = true;
-    results.push_back(pose_lib::benchmark<pose_lib::SolverP4PF>(1e4, p4pf_opt, tol));
+#define P4PF_TEST(companion, orth, filter) \
+    results.push_back(pose_lib::benchmark<pose_lib::SolverP4PF<companion,orth,pose_lib::p4pf_filter::filter>>(1e4, p4pf_opt, tol));
+#define P4PF_TEST_SOLVERS(orth, filter) \
+    P4PF_TEST(false, orth, filter);\
+    P4PF_TEST(true , orth, filter);
+#define P4PF_TEST_ORTH(filter) \
+    P4PF_TEST_SOLVERS(false, filter); \
+    P4PF_TEST_SOLVERS(true, filter);
+#define P4PF_TEST_FILTERS \
+    P4PF_TEST_ORTH(norm); \
+    P4PF_TEST_ORTH(singular_values); \
+    P4PF_TEST_ORTH(reprojection);
+
+    P4PF_TEST_FILTERS;
 
     // P2P2PL
     pose_lib::ProblemOptions p2p2pl_opt = options;
@@ -322,7 +425,10 @@ int main() {
     // Relative Pose 5pt
     pose_lib::ProblemOptions rel5pt_opt = options;
     rel5pt_opt.n_point_point_ = 5;
-    results.push_back(pose_lib::benchmark_relative<pose_lib::SolverRel5pt>(1e4, rel5pt_opt, tol));
+    // companion matrix eigenvalues
+    results.push_back(pose_lib::benchmark_relative<pose_lib::SolverRel5pt<true>>(1e4, rel5pt_opt, tol));
+    // sturm bracketing
+    results.push_back(pose_lib::benchmark_relative<pose_lib::SolverRel5pt<false>>(1e4, rel5pt_opt, tol));
 
 
     // Relative Pose Upright Planar 2pt

@@ -31,8 +31,27 @@
 #include "types.h"
 #include <Eigen/Dense>
 #include <vector>
+#include <string>
 
 namespace pose_lib {
+
+enum class p4pf_filter {
+  norm,
+  singular_values,
+  reprojection
+};
+
+inline std::string to_string(const p4pf_filter &filter) {
+  switch (filter) {
+    case p4pf_filter::norm:
+      return "-norm";
+    case p4pf_filter::singular_values:
+      return "-svd";
+    case p4pf_filter::reprojection:
+      return "-reproj";
+  }
+  return "UNKNOWN-ENUM-VALUE";
+};
 
 // Solves for camera pose and focal length (alpha) such that: lambda*diag(1,1,alpha)*x = R*X+t
 // Re-implementation of the p4pf solver from
@@ -41,6 +60,6 @@ namespace pose_lib {
 // having non-unit aspect ratio, i.e. fx = f * R.row(0).norm() and fy = f * R.row(1).norm();
 // If filter_solutions is true, only the solution with aspect ratio closest to 1 is returned.
 int p4pf(const std::vector<Eigen::Vector3d> &x, const std::vector<Eigen::Vector3d> &X,
-         std::vector<CameraPose> *output, bool filter_solutions = true);
+         std::vector<CameraPose> *output, bool companion_roots, p4pf_filter filter,  bool orthogonalize,  bool filter_solutions = true);
 
 } // namespace pose_lib

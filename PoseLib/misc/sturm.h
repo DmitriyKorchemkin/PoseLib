@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <cmath>
 #include <vector>
+#include <Eigen/Dense>
 #ifdef _MSC_VER
 #include <intrin.h>
 #define __builtin_popcount __popcnt
@@ -228,11 +229,26 @@ void isolate_roots(const double *fvec, const double *svec, double a, double b, i
     }
 }
 
-template<int N>
-inline int bisect_sturm(const double *coeffs, double *roots, double tol = 1e-10) {
-    if (coeffs[N] == 0.0)
-        return 0; // return bisect_sturm<N-1>(coeffs,roots,tol); // This explodes compile times...
-    
+template <int N>
+inline int bisect_sturm(const double* coeffs, double* roots, bool companion = false, double tol = 1e-12) {
+  if (coeffs[N] == 0.) return 0;
+
+    if (companion) {
+        Eigen::Matrix<double, N, N> companion;
+        companion.template bottomLeftCorner<N - 1, N - 1>().setIdentity();
+        companion.row(0).template head<N - 1>().setZero();
+        companion.col(N - 1) =
+            -Eigen::Map<const Eigen::Matrix<double, N, 1>>(coeffs) / coeffs[N];
+
+        auto ev = companion.eigenvalues();
+        int res = 0;
+        for (int i = 0; i < N; ++i) {
+            if (std::abs(std::imag(ev[i])) < std::abs(std::real(ev[i])) * tol) {
+                roots[res++] = std::real(ev[i]);
+            }
+        }
+        return res;
+    }
 
     double fvec[2*N+1];
     double svec[3*N];
@@ -274,7 +290,7 @@ inline int bisect_sturm(const double *coeffs, double *roots, double tol = 1e-10)
 }
 
 template<>
-inline int bisect_sturm<1>(const double* coeffs, double* roots, double tol) {
+inline int bisect_sturm<1>(const double* coeffs, double* roots, bool companion, double tol) {
     if (coeffs[1] == 0.0) {
         return 0;
     } else {
@@ -284,7 +300,7 @@ inline int bisect_sturm<1>(const double* coeffs, double* roots, double tol) {
 }
 
 template<>
-inline int bisect_sturm<0>(const double* coeffs, double* roots, double tol) {
+inline int bisect_sturm<0>(const double* coeffs, double* roots, bool companion, double tol) {
     return 0;
 }
 } // namespace sturm

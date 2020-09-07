@@ -75,6 +75,7 @@ struct RadialPoseValidator {
 };
 
 struct ProblemOptions {
+  int seed = 0;
   double min_depth_ = 0.1;
   double max_depth_ = 10.0;
   double camera_fov_ = 70.0;

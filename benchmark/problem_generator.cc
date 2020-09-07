@@ -165,7 +165,7 @@ void generate_abspose_problems(int n_problems, std::vector<AbsolutePoseProblemIn
     double fov_scale = std::tan(options.camera_fov_ / 2.0 * kPI / 180.0);
 
     // Random generators
-    std::default_random_engine random_engine;
+    std::mt19937 random_engine(options.seed);
     std::uniform_real_distribution<double> depth_gen(options.min_depth_, options.max_depth_);
     std::uniform_real_distribution<double> coord_gen(-fov_scale, fov_scale);
     std::uniform_real_distribution<double> scale_gen(options.min_scale_, options.max_scale_);
@@ -341,7 +341,7 @@ void generate_relpose_problems(int n_problems, std::vector<RelativePoseProblemIn
     double fov_scale = std::tan(options.camera_fov_ / 2.0 * kPI / 180.0);
 
     // Random generators
-    std::default_random_engine random_engine;
+    std::mt19937 random_engine(options.seed);
     std::uniform_real_distribution<double> depth_gen(options.min_depth_, options.max_depth_);
     std::uniform_real_distribution<double> coord_gen(-fov_scale, fov_scale);
     std::uniform_real_distribution<double> scale_gen(options.min_scale_, options.max_scale_);

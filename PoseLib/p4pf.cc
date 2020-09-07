@@ -27,12 +27,15 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "p4pf.h"
+#include "Eigen/src/Core/Matrix.h"
+#include "Eigen/src/Core/NumTraits.h"
+#include "Eigen/src/Core/util/Constants.h"
 #include "misc/re3q3.h"
 
 namespace pose_lib {
 
 int p4pf(const std::vector<Eigen::Vector3d> &x, const std::vector<Eigen::Vector3d> &X,
-         std::vector<CameraPose> *output, bool filter_solutions) {
+         std::vector<CameraPose> *output, bool companion_roots, const p4pf_filter filter, bool orthogonalize, bool filter_solutions) {
 
     Eigen::Matrix<double, 2, 4> points2d;
     for (int i = 0; i < 4; ++i) {
@@ -94,7 +97,7 @@ int p4pf(const std::vector<Eigen::Vector3d> &x, const std::vector<Eigen::Vector3
     Eigen::Matrix<double, 3, 10> coeffs;
     Eigen::Matrix<double, 3, 8> solutions;
 
-    // Orthogonality constraints
+    // norm constraints
     coeffs.row(0) << d[0] * d[1] + d[2] * d[3] + d[4] * d[5], d[0] * d[9] + d[1] * d[8] + d[2] * d[11] + d[3] * d[10] + d[4] * d[13] + d[5] * d[12], d[0] * d[17] + d[1] * d[16] + d[2] * d[19] + d[3] * d[18] + d[4] * d[21] + d[5] * d[20], d[8] * d[9] + d[10] * d[11] + d[12] * d[13], d[8] * d[17] + d[9] * d[16] + d[10] * d[19] + d[11] * d[18] + d[12] * d[21] + d[13] * d[20], d[16] * d[17] + d[18] * d[19] + d[20] * d[21], d[0] * d[25] + d[1] * d[24] + d[2] * d[27] + d[3] * d[26] + d[4] * d[29] + d[5] * d[28], d[8] * d[25] + d[9] * d[24] + d[10] * d[27] + d[11] * d[26] + d[12] * d[29] + d[13] * d[28], d[16] * d[25] + d[17] * d[24] + d[18] * d[27] + d[19] * d[26] + d[20] * d[29] + d[21] * d[28], d[24] * d[25] + d[26] * d[27] + d[28] * d[29];
     coeffs.row(1) << d[0] * d[32] + d[2] * d[33] + d[4] * d[34], d[0] * d[36] + d[2] * d[37] + d[8] * d[32] + d[4] * d[38] + d[10] * d[33] + d[12] * d[34], d[0] * d[40] + d[2] * d[41] + d[4] * d[42] + d[16] * d[32] + d[18] * d[33] + d[20] * d[34], d[8] * d[36] + d[10] * d[37] + d[12] * d[38], d[8] * d[40] + d[10] * d[41] + d[16] * d[36] + d[12] * d[42] + d[18] * d[37] + d[20] * d[38], d[16] * d[40] + d[18] * d[41] + d[20] * d[42], d[0] * d[44] + d[2] * d[45] + d[4] * d[46] + d[24] * d[32] + d[26] * d[33] + d[28] * d[34], d[8] * d[44] + d[10] * d[45] + d[12] * d[46] + d[24] * d[36] + d[26] * d[37] + d[28] * d[38], d[16] * d[44] + d[18] * d[45] + d[24] * d[40] + d[20] * d[46] + d[26] * d[41] + d[28] * d[42], d[24] * d[44] + d[26] * d[45] + d[28] * d[46];
     coeffs.row(2) << d[1] * d[32] + d[3] * d[33] + d[5] * d[34], d[1] * d[36] + d[3] * d[37] + d[9] * d[32] + d[5] * d[38] + d[11] * d[33] + d[13] * d[34], d[1] * d[40] + d[3] * d[41] + d[5] * d[42] + d[17] * d[32] + d[19] * d[33] + d[21] * d[34], d[9] * d[36] + d[11] * d[37] + d[13] * d[38], d[9] * d[40] + d[11] * d[41] + d[17] * d[36] + d[13] * d[42] + d[19] * d[37] + d[21] * d[38], d[17] * d[40] + d[19] * d[41] + d[21] * d[42], d[1] * d[44] + d[3] * d[45] + d[5] * d[46] + d[25] * d[32] + d[27] * d[33] + d[29] * d[34], d[9] * d[44] + d[11] * d[45] + d[13] * d[46] + d[25] * d[36] + d[27] * d[37] + d[29] * d[38], d[17] * d[44] + d[19] * d[45] + d[25] * d[40] + d[21] * d[46] + d[27] * d[41] + d[29] * d[42], d[25] * d[44] + d[27] * d[45] + d[29] * d[46];
@@ -102,10 +105,22 @@ int p4pf(const std::vector<Eigen::Vector3d> &x, const std::vector<Eigen::Vector3
     // The fourth unused constraint (norms of two first rows equal)
     //	d[0] * d[0] - d[1] * d[1] + d[2] * d[2] - d[3] * d[3] + d[4] * d[4] - d[5] * d[5], 2 * d[0] * d[8] - 2 * d[1] * d[9] + 2 * d[2] * d[10] - 2 * d[3] * d[11] + 2 * d[4] * d[12] - 2 * d[5] * d[13], 2 * d[0] * d[16] - 2 * d[1] * d[17] + 2 * d[2] * d[18] - 2 * d[3] * d[19] + 2 * d[4] * d[20] - 2 * d[5] * d[21], d[8] * d[8] - d[9] * d[9] + d[10] * d[10] - d[11] * d[11] + d[12] * d[12] - d[13] * d[13], 2 * d[8] * d[16] - 2 * d[9] * d[17] + 2 * d[10] * d[18] - 2 * d[11] * d[19] + 2 * d[12] * d[20] - 2 * d[13] * d[21], d[16] * d[16] - d[17] * d[17] + d[18] * d[18] - d[19] * d[19] + d[20] * d[20] - d[21] * d[21], 2 * d[0] * d[24] - 2 * d[1] * d[25] + 2 * d[2] * d[26] - 2 * d[3] * d[27] + 2 * d[4] * d[28] - 2 * d[5] * d[29], 2 * d[8] * d[24] - 2 * d[9] * d[25] + 2 * d[10] * d[26] - 2 * d[11] * d[27] + 2 * d[12] * d[28] - 2 * d[13] * d[29], 2 * d[16] * d[24] - 2 * d[17] * d[25] + 2 * d[18] * d[26] - 2 * d[19] * d[27] + 2 * d[20] * d[28] - 2 * d[21] * d[29], d[24] * d[24] - d[25] * d[25] + d[26] * d[26] - d[27] * d[27] + d[28] * d[28] - d[29] * d[29];
 
-    int n_sols = re3q3::re3q3(coeffs, &solutions);
+    int n_sols = re3q3::re3q3(coeffs, &solutions, true, companion_roots);
 
     CameraPose best_pose;
-    double best_res = 1.0; // we are probably not interested in solutions above this res anyway
+    double best_res = 0.;
+    switch (filter) {
+      case p4pf_filter::norm:
+        // we are probably not interested in solutions above this res anyway
+        best_res = 1.;
+        break;
+      case p4pf_filter::singular_values:
+        best_res = .2;
+        break;
+      case p4pf_filter::reprojection:
+        best_res = 16.;
+        break;
+    }
     output->clear();
     for (int i = 0; i < n_sols; ++i) {
         Eigen::Matrix<double, 3, 4> P;
@@ -124,14 +139,44 @@ int p4pf(const std::vector<Eigen::Vector3d> &x, const std::vector<Eigen::Vector3
         P.row(1) = P.row(1) / focal;
 
         // TODO:  Project to rotations?
-
         CameraPose pose;
-        pose.R = P.block<3, 3>(0, 0);
-        pose.t = P.block<3, 1>(0, 3);
+        Eigen::JacobiSVD<Eigen::Matrix3d> svd;
+        int svd_opts = 0;
+        if (orthogonalize) {
+          svd_opts |= Eigen::ComputeFullU | Eigen::ComputeFullV;
+        }
+
+        if (orthogonalize || filter == p4pf_filter::singular_values) {
+          svd.compute(P.topLeftCorner<3, 3>(), svd_opts);
+        }
+
+        if  (orthogonalize ) {
+          pose.R = svd.matrixU() * svd.matrixV().transpose();
+        } else {
+          pose.R = P.topLeftCorner<3, 3>();
+        }
+        pose.t = P.topRightCorner<3, 1>();
         pose.alpha = focal * f0;
 
-        if (filter_solutions) {
-            double res = std::abs(pose.R.row(0).squaredNorm() - 1.0) + std::abs(pose.R.row(1).squaredNorm() - 1.0);
+        if (filter_solutions && !(!orthogonalize && filter == p4pf_filter::reprojection)) {
+             double res = 0.;
+             switch (filter) {
+               case p4pf_filter::norm:
+                 // Using P since R might be already orthogonalized
+                 res = std::abs(P.row(0).head<3>().squaredNorm() - 1.0) +
+                       std::abs(P.row(0).head<3>().squaredNorm() - 1.0);
+                 break;
+               case p4pf_filter::singular_values:
+                 res = (svd.singularValues() - Eigen::Vector3d::Ones())
+                           .squaredNorm();
+                 break;
+               case p4pf_filter::reprojection:
+                 for (int i = 0; i < 4; ++i)
+                   res += (points2d.col(i) -
+                           (pose.R * X[i] + pose.t).hnormalized() * focal)
+                              .squaredNorm();
+                 break;
+            }
             if (res < best_res) {
                 best_pose = pose;
                 best_res = res;
@@ -141,7 +186,7 @@ int p4pf(const std::vector<Eigen::Vector3d> &x, const std::vector<Eigen::Vector3
         }
     }
 
-    if (filter_solutions && best_res < 1.0)
+    if (filter_solutions)
         output->push_back(best_pose);
 
     return output->size();
